@@ -4,7 +4,6 @@ Resources:
   myVPC:
     Type: AWS::EC2::VPC
     Properties:
-      Region: 'us-east-1'
       CidrBlock: '192.168.0.0/16'
       EnableDnsSupport: 'false'
       EnableDnsHostnames: 'false'
