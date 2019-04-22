@@ -1,0 +1,160 @@
+###Maintainer Adsy
+---
+AWSTemplateFormatVersion: 2010-09-09
+Resources:
+  myvpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: '192.168.0.0/16'
+      EnableDnsSupport: 'false'
+      EnableDnsHostnames: 'false'
+      InstanceTenancy: 'default'
+      Tags:
+      - key: foo
+        valuse: bar
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+  vpcGstewatyAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref InternetGateway
+      InternetGatewayId: !Ref InternetGateway
+  ##Subnets for myVPC
+  Pub-sub:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref myvpc
+      CidrBlock: 192.168.1.0/24
+      MapPublicIpOnLaunch: true
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+
+  priv-subA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref myvpc
+      CidrBlock: 192.168.2.0/24
+      MapPublicIpOnLaunch: false
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+  priv-subB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref myvpc
+      CidrBlock: 192.168.3.0/24
+      MapPublicIpOnLaunch: false
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+  RouteTables-pub:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref myvpc
+  InternetRoute:
+    Type: AWS::EC2::Route
+    DependsOn: vpcGstewatyAttachment
+    Properties:
+      DestinationCidrBlock: '0.0.0.0/0'
+      GatewayId: !Ref InternetGateway
+      RouteTableId: !Ref RouteTables-pub
+  RouteTable-priv:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref myvpc
+  PrivateRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref RouteTable-priv
+
+  pub-subRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref RouteTables-pub
+      SubnetId: !Ref Pub-sub
+  priv-subARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref RouteTable-priv
+      SubnetId: !Ref priv-subA
+  priv-subBRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref RouteTable-priv
+      SubnetId: !Ref priv-subB
+
+  pubSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: 'Public'
+      GroupDescription: "SSH traffic in, all traffic out"
+      VpcId: !Ref myvpc
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: '22'
+        ToPort: '22'
+        CidrIp: 0.0.0.0/0
+      - IpProtocol: http
+        FromPort: '80'
+        ToPort: '80'
+        cifrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+      - IpProtocol: -1
+        CidrIp: 0.0.0.0/0
+  privSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: 'private'
+      GroupDescription: "SSH Traffic in, myIp"
+      VpcId: !Ref myvpc
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: '22'
+        ToPort: '22'
+        cidrIp: !Ref Pub-sub
+
+  WebServer:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: t2.nano
+      ImageId: ami-80861296
+      KeyName: test
+      SecurityGroupIds: !Ref pubSecurityGroup
+      SubnetId: !Ref Pub-sub
+      BlockDeviceMappings:
+        DeviceName: "/dev/sda1"
+        Ebs:
+          VolumeSize: 10
+          VolumeType: gp2
+      Tags:
+        -
+          Key: Name
+          Value: webserver
+
+  dbServer:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: t2.nano
+      ImageId: ami-80861296
+      KeyName: test
+      SecurityGroupIds: !Ref privSecurityGroup
+      SubnetId: !Ref priv-subA
+      BlockDeviceMappings: "/dev/sda1"
+      Ebs:
+        VolumeSize: 10
+        VolumeType: gp2
+      Tags:
+        -
+          Key: Name
+          Value: dbServer
+  db2Server:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: t2.nano
+      ImageId: ami-80861296
+      KeyName: test
+      SecurityGroupIds: !Ref privSecurityGroup
+      SubnetId: !Ref priv-subB
+      BlockDeviceMappings: "/dev/sda1"
+      Ebs:
+        VolumeSize: 10
+        VolumeType: gp2
+      Tags:
+      - Key: Name
+        Value: db2Server
+
